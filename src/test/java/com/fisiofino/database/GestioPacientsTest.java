@@ -7,10 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.Properties;
@@ -25,8 +27,10 @@ import com.fisiofino.model.Pacient;
 
 /**
  * Tests mínims de la base de dades.
- * Abans de cada test es recrea l'esquema, sempre es parteix de taules buides.
- * Fa servir src/test/resources/conn.properties: una base de dades de PROVES
+ * Les taules les crea docker compose (schema.sql) en arrencar postgres-test.
+ * Abans de cada test es buiden, així sempre es parteix de taules buides.
+ * Fa servir conn.test.properties (arrel del projecte): una base de dades de
+ * PROVES
  */
 class GestioPacientsTest {
 
@@ -40,7 +44,7 @@ class GestioPacientsTest {
 
     @BeforeAll
     static void iniciaElPool() throws Exception {
-        Connexio.iniciaConnexio("src/test/resources/conn.properties");
+        Connexio.iniciaConnexio("conn.test.properties");
     }
 
     @AfterAll
@@ -50,13 +54,10 @@ class GestioPacientsTest {
 
     @BeforeEach
     void estatInicial() throws Exception {
-        // Esborra les taules de la base de dades de PROVES i les torna a crear
-        String esquema;
-        try (InputStream is = getClass().getResourceAsStream("/schema.sql")) {
-            esquema = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-        }
-        executa("DROP TABLE IF EXISTS patient_disease, disease, patient CASCADE");
-        executa(esquema);
+        // Les taules ja les ha creat docker compose (schema.sql); només les buidem
+        executa("TRUNCATE patient_disease RESTART IDENTITY CASCADE");
+        executa("TRUNCATE disease RESTART IDENTITY CASCADE");
+        executa("TRUNCATE patient RESTART IDENTITY CASCADE");
     }
 
     @Test
@@ -204,7 +205,8 @@ class GestioPacientsTest {
 
     // ---------- Ajudes: dades de prova ----------
 
-    // Mateixes dades que pacientes_bluebutton.xml (pacients 1 i 2), sense llegir el fitxer.
+    // Mateixes dades que pacientes_bluebutton.xml (pacients 1 i 2), sense llegir el
+    // fitxer.
 
     private static Pacient laura() {
         return pacient(DNI_LAURA, "Laura", "Exemple Roca", "F", LocalDate.of(1985, 3, 14),
@@ -265,16 +267,22 @@ class GestioPacientsTest {
 
     private static Connection obreConnexio() throws Exception {
         Properties p = new Properties();
-        try (InputStream is = GestioPacientsTest.class.getResourceAsStream("/conn.properties")) {
+        try (InputStream is = Files.newInputStream(Path.of("conn.test.properties"))) {
             p.load(is);
         }
         return DriverManager.getConnection(p.getProperty("DB_URL"), p.getProperty("DB_USER"),
                 p.getProperty("DB_PASSWORD"));
     }
 
+    /**
+     * Executa una sentència; si falla (p. ex. la taula encara no existeix) no fa
+     * res.
+     */
     private static void executa(String sql) throws Exception {
         try (Connection c = obreConnexio(); Statement s = c.createStatement()) {
             s.execute(sql);
+        } catch (SQLException e) {
+            // ignorem l'error
         }
     }
 

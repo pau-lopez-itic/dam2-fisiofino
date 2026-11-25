@@ -10,10 +10,10 @@ import com.fisiofino.vista.MenuView;
 public class Main {
     public static void main(String[] args) {
         try {
-            Connexio.iniciaConnexio();
+            Connexio.iniciaConnexio("conn.properties");
             MenuView vista = new MenuView();
             GestioPacients gestioPacients = new GestioPacients();
-            Controller conT = new Controller(vista,gestioPacients);
+            Controller conT = new Controller(vista, gestioPacients);
             conT.inicia();
         } catch (IOException e) {
             System.out.println("No s'ha pogut carregar la configuració: " + e.getMessage());
